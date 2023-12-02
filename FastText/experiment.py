@@ -228,10 +228,11 @@ def eval_retrieval(qrels, query_file="qrels-folder/test_queries.txt", k=1000):
 
 
 if __name__ == '__main__':
-    # Evaluasi Validation set
-    qrels = load_qrels(qrel_file='qrels-folder/val_qrels.txt')
-    eval_retrieval(qrels, query_file='qrels-folder/val_queries.txt')
+    with open('hasil-evaluasi.txt', 'w') as f:
+        # Evaluasi Validation set
+        qrels = load_qrels(qrel_file='qrels-folder/val_qrels.txt')
+        eval_retrieval(qrels, query_file='qrels-folder/val_queries.txt')
 
-    # Evaluasi Test set
-    qrels = load_qrels()
-    eval_retrieval(qrels)
+        # Evaluasi Test set
+        qrels = load_qrels()
+        eval_retrieval(qrels)

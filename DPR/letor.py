@@ -1,6 +1,6 @@
 import numpy as np
 import lightgbm as lgb
-from gensim.models import LsiModel, TfidfModel
+from gensim.models import LsiModel, TfidfModel, OkapiBM25Model, Word2Vec
 from gensim.corpora import Dictionary
 from scipy.spatial.distance import cosine
 from bsbi import BSBIIndex
@@ -52,6 +52,35 @@ class LETOR:
         bow_corpus = [self.dictionary.doc2bow(doc, allow_update = True) for doc in documents.values()]
         self.tfidf_model = TfidfModel(bow_corpus, smartirs='lfn')
 
+    def get_tfidf(self, query, doc):
+        query_term_ids = [term_id for (term_id, _) in self.dictionary.doc2bow(query)]
+        tfidf = 0
+        for (term_id, score) in self.tfidf_model[self.dictionary.doc2bow(doc)]:
+            if term_id in query_term_ids:
+                tfidf += score
+        return tfidf
+
+    def build_bm25_model(self, documents):
+        """
+        Membuat bag-of-words corpus dan score BM25
+        dari kumpulan dokumen.
+
+        Parameters
+        ----------
+        documents: dict[str, str]
+            Dictionary doc id dan term di dokumen
+        """
+        bow_corpus = [self.dictionary.doc2bow(doc, allow_update = True) for doc in documents.values()]
+        self.bm25_model = OkapiBM25Model(bow_corpus)
+
+    def get_bm25(self, query, doc):
+        query_term_ids = [term_id for (term_id, _) in self.dictionary.doc2bow(query)]
+        bm25 = 0
+        for (term_id, score) in self.bm25_model[self.dictionary.doc2bow(doc)]:
+            if term_id in query_term_ids:
+                bm25 += score
+        return bm25
+
     def vector_rep(self, text):
         """
         Representasi vector dari sebuah dokumen atau query
@@ -64,7 +93,7 @@ class LETOR:
         rep = [topic_value for (_, topic_value) in self.lsi_model[self.dictionary.doc2bow(text)]]
         return rep if len(rep) == self.NUM_LATENT_TOPICS else [0.] * self.NUM_LATENT_TOPICS
     
-    def features(self, query, doc):
+    def features0(self, query, doc):
         """
         Representasi vector dari gabungan dokumen dan query
         Berisi concat(vector(query), vector(document)) + informasi lain
@@ -85,16 +114,8 @@ class LETOR:
         cosine_dist = cosine(v_q, v_d)
         jaccard = len(q & d) / len(q | d)
         return v_q + v_d + [jaccard] + [cosine_dist]
-    
-    def get_tfidf(self, query, doc):
-        query_term_ids = [term_id for (term_id, _) in self.tfidf_model[self.dictionary.doc2bow(query)]]
-        tfidf = 0
-        for (term_id, score) in self.tfidf_model[self.dictionary.doc2bow(doc)]:
-            if term_id in query_term_ids:
-                tfidf += score
-        return tfidf
 
-    def features2(self, query, doc):
+    def features1(self, query, doc):
         """
         Representasi vector dari gabungan dokumen dan query
         Berisi TF-IDF + Cosine Distance + Jaccard Similarity antara query dan doc
@@ -115,6 +136,48 @@ class LETOR:
         tfidf = self.get_tfidf(query, doc)
         return [tfidf] + [jaccard] + [cosine_dist]
     
+    def features2(self, query, doc):
+        """
+        Representasi vector dari gabungan dokumen dan query
+        Berisi BM25 + Cosine Distance + Jaccard Similarity antara query dan doc
+
+        Parameters
+        ----------
+        query: List[str]
+            Term dari query
+        doc: List[str]
+            Term dari dokumen
+        """
+        v_q = self.vector_rep(query)
+        v_d = self.vector_rep(doc)
+        q = set(query)
+        d = set(doc)
+        cosine_dist = cosine(v_q, v_d)
+        jaccard = len(q & d) / len(q | d)
+        bm25 = self.get_bm25(query, doc)
+        return [bm25] + [jaccard] + [cosine_dist]
+    
+    def append_features(self, X, query, doc):
+        """
+        Append features to array X
+
+        Parameters
+        ----------
+        X: List[float]
+            Empty list
+        query: List[str]
+            Term dari query
+        doc: List[str]
+            Term dari dokumen
+        """
+        if self.mode == 0:
+            X.append(self.features0(query, doc))
+        elif self.mode == 1:
+            X.append(self.features1(query, doc))
+        elif self.mode == 2:
+            X.append(self.features2(query, doc))
+        return X
+    
     def split_dataset(self, dataset):
         """
         Split dataset menjadi X (representasi gabungan query dan dokumen)
@@ -127,10 +190,11 @@ class LETOR:
         """
         X, Y = [], []
         for (query, doc, rel) in dataset:
-            if self.mode == 0:
-                X.append(self.features(query, doc))
-            elif self.mode == 1:
-                X.append(self.features2(query, doc))
+            token = TextPreprocessing.stem_tokens(doc)
+            d_terms = TextPreprocessing.remove_stop_words(token)
+            token = TextPreprocessing.stem_tokens(query)
+            q_terms = TextPreprocessing.remove_stop_words(token)
+            X = self.append_features(X, q_terms, d_terms)
             Y.append(rel)
         X = np.array(X)
         Y = np.array(Y)
@@ -145,6 +209,8 @@ class LETOR:
         self.build_lsi_model(train_dataset.documents)
         if self.mode == 1:
             self.build_tfidf_model(train_dataset.documents)
+        elif self.mode == 2:
+            self.build_bm25_model(train_dataset.documents)
 
         X_train, Y_train = self.split_dataset(train_dataset.dataset)
         self.ranker.fit(X_train, Y_train, 
@@ -162,17 +228,17 @@ class LETOR:
         """
         X = []
         docs_path = []
-        scores_docs_path = self.BSBI_instance.retrieve_tfidf(query, k=100)
+        if self.mode == 0 or self.mode == 1:
+            scores_docs_path = self.BSBI_instance.retrieve_tfidf(query, k=100)
+        elif self.mode == 2:
+            scores_docs_path = self.BSBI_instance.retrieve_bm25(query, k=100)
         for _, doc_path in scores_docs_path:
             with open(doc_path, 'rb') as file:
                 doc = str(file.readline().decode())
                 d_terms = TextPreprocessing.get_terms(doc)
                 q_terms = TextPreprocessing.get_terms(query)
                 docs_path.append(doc_path)
-                if self.mode == 0:
-                    X.append(self.features(q_terms, d_terms))
-                elif self.mode == 1:
-                    X.append(self.features2(q_terms, d_terms))
+                X = self.append_features(X, q_terms, d_terms)
         if len(X) == 0:
             return []
         X = np.array(X)
@@ -185,7 +251,7 @@ if __name__ == "__main__":
     BSBI_instance = BSBIIndex(data_dir='collections',
                             postings_encoding=VBEPostings,
                             output_dir='index')
-    mode = 1
+    mode = 0
     LETOR_instance = LETOR(qrels_path='qrels-folder', BSBI_instance=BSBI_instance, mode=mode)
     """
     LETOR agak berbeda dengan yang terdapat di Google Colab karena ditambahkan proses
@@ -194,18 +260,11 @@ if __name__ == "__main__":
         Mode fitur yang digunakan untuk reranking
         0: LSI query + LSI dokumen + Cosine Distance + Jaccard Similarity (seperti Google Colab)
         1: TF-IDF + Cosine Distance + Jaccard Similarity
+        2: BM25 + Cosine Distance + Jaccard Similarity
     """
 
     queries = ["Jumlah uang terbatas yang telah ditentukan sebelumnya bahwa seseorang harus membayar dari tabungan mereka sendiri"]
-    print("BSBI TF-IDF")
-    for query in queries:
-        print("Query  : ", query)
-        print("Results:")
-        for (score, doc) in BSBI_instance.retrieve_tfidf(query, k=10):
-            print(f"{doc:30} {score:>.3f}")
-        print()
-
-    print(f"BSBI TF-IDF with LETOR Mode {mode}")
+    print(f"BSBI with LETOR Mode {mode}")
     for query in queries:
         print("Query  : ", query)
         print("Results:")
