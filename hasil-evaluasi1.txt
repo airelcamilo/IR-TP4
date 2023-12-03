@@ -1,0 +1,29 @@
+Hasil evaluasi Test Set
+Hasil evaluasi with LETOR Mode 0
+RBP score = 0.74
+DCG score = 6.57
+AP score  = 0.70
+Hasil evaluasi with LETOR Mode 1
+RBP score = 0.83
+DCG score = 7.21
+AP score  = 0.78
+Hasil evaluasi with LETOR Mode 2
+RBP score = 0.87
+DCG score = 7.40
+AP score  = 0.84
+Hasil evaluasi with LETOR Mode 3
+RBP score = 0.88
+DCG score = 7.43
+AP score  = 0.85
+Hasil evaluasi with LETOR Mode 4
+RBP score = 0.89
+DCG score = 7.48
+AP score  = 0.87
+Hasil evaluasi with LETOR Mode 5
+RBP score = 0.89
+DCG score = 7.47
+AP score  = 0.87
+Hasil evaluasi with LETOR Mode 6
+RBP score = 0.90
+DCG score = 7.51
+AP score  = 0.87
