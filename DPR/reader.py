@@ -1,7 +1,7 @@
 import torch
 from typing import List
 from transformers import DPRReader, DPRReaderTokenizer
-from chunker import DocumentChunker
+# from chunker import DocumentChunker
 
 class DPRReader(DocumentChunker):
 
@@ -17,7 +17,8 @@ class DPRReader(DocumentChunker):
 
 
     def __init__(self):
-        super(DocumentChunker).__init__()
+        # super(DocumentChunker).__init__()
+        super(DPRIndex, self).__init__()
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         if self.device == 'cuda':
             self.reader_model = self.reader_model.cuda()
