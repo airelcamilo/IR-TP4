@@ -3,6 +3,7 @@ import os
 from collections import defaultdict
 from tqdm import tqdm
 import math
+from build import dpr
 
 # >>>>> 3 IR metrics: RBP p = 0.8, DCG, dan AP
 def rbp(ranking, p=0.8):
