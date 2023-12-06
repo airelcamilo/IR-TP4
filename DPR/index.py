@@ -92,7 +92,7 @@ class DPRIndex(DocumentChunker):
             input_ids).pooler_output.detach().numpy()
         return embeddings
 
-    def search_dense_index(self, question: str, k: int = 5):
+    def search_dense_index(self, question: str, k: int = 100):
         '''
         Search the vector index by encoding the question and then performing
         nearest neighbor on the FAISS index of context vectors.
