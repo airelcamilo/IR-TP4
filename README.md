@@ -21,8 +21,6 @@
     ./bin/elasticsearch
     ```
 
-### Demo
-Collab Link: https://colab.research.google.com/drive/1FU38Lp7v36dlEgIuzq4ihpoc5BoromlR?usp=sharing
-
-### Presentation Video
-YouTube Link: 
+### Links
+- Dense Passage Retriever G-Collab: https://colab.research.google.com/drive/1FU38Lp7v36dlEgIuzq4ihpoc5BoromlR?usp=sharing
+- Presentation Video:
