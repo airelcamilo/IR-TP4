@@ -4,17 +4,18 @@ import torch
 import faiss
 from tqdm import tqdm
 from typing import List
-from elasticsearch import Elasticsearch
 from transformers import (DPRContextEncoder, DPRContextEncoderTokenizer,
                           DPRQuestionEncoder, DPRQuestionEncoderTokenizer)
 from chunker import DocumentChunker
 from document import DPRDocument
+import os
+import json
 
 class DPRIndex(DocumentChunker):
 
     '''
     Class for indexing and searching documents, using a combination of
-    vectors producted by DPR and keyword matching from Elastic TF-IDF. As a
+    vectors produced by DPR and keyword matching from Elastic TF-IDF. As a
     subclass of DocumentChunker, this class automatically handles document
     chunking as well.
     '''
@@ -36,18 +37,17 @@ class DPRIndex(DocumentChunker):
         if self.device == 'cuda':
             self.reader_model = self.reader_model.cuda()
         self.faiss_index = faiss.IndexFlatIP(self.D)
-        self._setup_elastic_index()
-        self._build_index(documents)
+        self._setup_json_index()
+        self._build_json_index(documents)
 
-    def _setup_elastic_index(self):
-        '''Sets up the Elastic Index. Deletes old ones if needed.'''
-        self.es = Elasticsearch()
-        if self.es.indices.exists(self.INDEX_NAME):
-            logging.warning(f'Deleting old index for {self.INDEX_NAME}.')
-            self.es.indices.delete(self.INDEX_NAME)
-        self.es.indices.create(index=self.INDEX_NAME)
+    def _setup_json_index(self):
+        '''Sets up the JSON Index. Deletes old ones if needed.'''
+        json_filename = 'index_data.json'
+        if os.path.exists(json_filename):
+            logging.warning(f'Deleting old JSON index file: {json_filename}.')
+            os.remove(json_filename)
 
-    def _build_index(self, documents):
+    def _build_json_index(self, documents):
         '''
         Initializes the data structure to keep track of which chunks
         correspond to which documents.
@@ -66,8 +66,10 @@ class DPRIndex(DocumentChunker):
             for chunked_doc in chunked_docs:
                 chunk_embedding = self.embed_context(chunked_doc)
                 self.faiss_index.add(chunk_embedding)
-                self.es.create(self.INDEX_NAME, id=chunk_counter,
-                               body={'chunk': chunked_doc})
+                # Save chunk data to JSON file
+                with open('index_data.json', 'a') as json_file:
+                    json.dump({'chunk_id': chunk_counter, 'chunk': chunked_doc, 'doc_id': doc_counter}, json_file)
+                    json_file.write('\n')  # Add newline for multiple entries
                 self.chunk_index[chunk_counter] = doc_counter
                 self.inverse_chunk_index[doc_counter].append(chunk_counter)
                 chunk_counter += 1
@@ -97,7 +99,7 @@ class DPRIndex(DocumentChunker):
 
         Args:
             question (str):
-                The natural language question, e.g. `who is bill gates?`
+                The natural language question, e.g., `who is bill gates?`
             k (int):
                 The number of documents to return from the index.
         '''
@@ -123,23 +125,19 @@ class DPRIndex(DocumentChunker):
         return structured_response
 
     def search_sparse_index(self, query):
-        body = {
-            'size': 10,
-            'query': {
-                'match': {
-                    'chunk': query
-                }
-            }
-        }
-        results = self.es.search(index=self.INDEX_NAME, body=body)
-        hits = results['hits']['hits']
-        return hits
+        with open('index_data.json', 'r') as json_file:
+            data = [json.loads(line) for line in json_file]
+        
+        # Perform search in-memory
+        results = [entry for entry in data if query in entry['chunk']]
+
+        return results
 
     def _merge_results(self, sparse_results, dense_results):
         '''Merges the results of sparse and dense retrieval.'''
         results_index = {}
         for sparse_result in sparse_results:
-            id, score = sparse_result['_id'], sparse_result['_score']
+            id, score = sparse_result['chunk_id'], sparse_result['elastic_score']
             id = int(id)
             results_index[id] = {'elastic_score': score}
         for dense_result in dense_results:
