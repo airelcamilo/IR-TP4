@@ -3,7 +3,6 @@ import os
 from collections import defaultdict
 from tqdm import tqdm
 import math
-from build import dpr
 
 # >>>>> 3 IR metrics: RBP p = 0.8, DCG, dan AP
 def rbp(ranking, p=0.8):
@@ -154,16 +153,15 @@ def eval_retrieval(qrels, query_file="qrels-folder-for-dpr/test_queries.txt", k=
             # Normalisasi min-max pada kolom 'reader_relevance'
             max_relevance = max(data['scores']['reader_relevance'] for data in results)
             min_relevance = min(data['scores']['reader_relevance'] for data in results)
-            
+
             for data in results:
                 data['scores']['normalized_reader_relevance'] = (data['scores']['reader_relevance'] - min_relevance) / (max_relevance - min_relevance)
 
             for result in results:
                 score = result['scores']['normalized_reader_relevance']
-                doc = result['document']['title']
+                doc = int(result['document']['title'])
 
-                did = int(os.path.splitext(os.path.basename(doc))[0])
-                if (did in qrels[qid]):
+                if (doc in qrels[qid]):
                     ranking_reader_relevance.append(1)
                 else:
                     ranking_reader_relevance.append(0)
