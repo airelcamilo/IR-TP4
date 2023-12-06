@@ -7,7 +7,7 @@ from build import dpr
 
 # >>>>> 3 IR metrics: RBP p = 0.8, DCG, dan AP
 def rbp(ranking, p=0.8):
-    """ menghitung search effectiveness metric score dengan 
+    """ menghitung search effectiveness metric score dengan
         Rank Biased Precision (RBP)
 
         Parameters
@@ -32,7 +32,7 @@ def rbp(ranking, p=0.8):
 
 
 def dcg(ranking):
-    """ menghitung search effectiveness metric score dengan 
+    """ menghitung search effectiveness metric score dengan
         Discounted Cumulative Gain
 
         Parameters
@@ -57,7 +57,7 @@ def dcg(ranking):
 
 
 def prec(ranking, k):
-    """ menghitung search effectiveness metric score dengan 
+    """ menghitung search effectiveness metric score dengan
         Precision at K
 
         Parameters
@@ -82,7 +82,7 @@ def prec(ranking, k):
 
 
 def ap(ranking):
-    """ menghitung search effectiveness metric score dengan 
+    """ menghitung search effectiveness metric score dengan
         Average Precision
 
         Parameters
@@ -111,14 +111,14 @@ def ap(ranking):
 
 # >>>>> memuat qrels
 def load_qrels(qrel_file="qrels-folder-for-dpr/test_qrels.txt"):
-    """ 
-        memuat query relevance judgment (qrels) 
+    """
+        memuat query relevance judgment (qrels)
         dalam format dictionary of dictionary qrels[query id][document id],
         dimana hanya dokumen yang relevan (nilai 1) yang disimpan,
         sementara dokumen yang tidak relevan (nilai 0) tidak perlu disimpan,
         misal {"Q1": {500:1, 502:1}, "Q2": {150:1}}
     """
-    qrels = defaultdict(lambda: defaultdict(lambda: 0)) 
+    qrels = defaultdict(lambda: defaultdict(lambda: 0))
     with open(qrel_file) as file:
         for line in file:
             parts = line.strip().split()
@@ -128,9 +128,9 @@ def load_qrels(qrel_file="qrels-folder-for-dpr/test_qrels.txt"):
     return qrels
 
 
-# >>>>> EVALUASI 
+# >>>>> EVALUASI
 def eval_retrieval(qrels, query_file="qrels-folder-for-dpr/test_queries.txt", k=5):
-    """ 
+    """
       loop ke semua query, hitung score di setiap query,
       lalu hitung MEAN SCORE-nya.
       untuk setiap query, kembalikan top-5 documents
@@ -149,8 +149,17 @@ def eval_retrieval(qrels, query_file="qrels-folder-for-dpr/test_queries.txt", k=
             Evaluasi Reader-Relevance Score
             """
             ranking_reader_relevance = []
-            for result in dpr.search(query):
-                score = result['scores']['reader_relevance']
+            results = dpr.search(query)
+
+            # Normalisasi min-max pada kolom 'reader_relevance'
+            max_relevance = max(data['scores']['reader_relevance'] for data in results)
+            min_relevance = min(data['scores']['reader_relevance'] for data in results)
+            
+            for data in results:
+                data['scores']['normalized_reader_relevance'] = (data['scores']['reader_relevance'] - min_relevance) / (max_relevance - min_relevance)
+
+            for result in results:
+                score = result['scores']['normalized_reader_relevance']
                 doc = result['document']['title']
 
                 did = int(os.path.splitext(os.path.basename(doc))[0])

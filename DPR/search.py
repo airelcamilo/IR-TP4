@@ -17,6 +17,10 @@ def results_to_dataframe(results):
         data['reader_relevance'].append(result['scores']['reader_relevance'])
 
     df = pd.DataFrame(data)
+
+    # Normalisasi min-max pada kolom 'reader_relevance'
+    df['normalized_reader_relevance'] = (df['reader_relevance'] - df['reader_relevance'].min()) / (df['reader_relevance'].max() - df['reader_relevance'].min())
+    
     return df
 
 # Menggunakan fungsi untuk mengonversi hasil pencarian ke dalam dataframe
