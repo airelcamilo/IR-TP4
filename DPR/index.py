@@ -6,8 +6,8 @@ from tqdm import tqdm
 from typing import List
 from transformers import (DPRContextEncoder, DPRContextEncoderTokenizer,
                           DPRQuestionEncoder, DPRQuestionEncoderTokenizer)
-# from chunker import DocumentChunker
-# from document import DPRDocument
+from chunker import DocumentChunker
+from document import DPRDocument
 import os
 import json
 

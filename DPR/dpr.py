@@ -1,5 +1,5 @@
-# from reader import DPRReader
-# from index import DPRIndex
+from reader import DPRReader
+from index import DPRIndex
 
 class DensePassageRetriever(DPRIndex, DPRReader):
 

@@ -1,7 +1,8 @@
 import torch
 from typing import List
 from transformers import DPRReader, DPRReaderTokenizer
-# from chunker import DocumentChunker
+from chunker import DocumentChunker
+from dpr import DPRIndex
 
 class DPRReader(DocumentChunker):
 
